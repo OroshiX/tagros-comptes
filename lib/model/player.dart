@@ -1,22 +1,16 @@
 import 'package:flutter/cupertino.dart';
+import 'package:tagros_comptes/data/database_moor.dart';
 
-class Player {
+class PlayerBean {
   int id;
   String name;
 
-  Player({@required this.name, this.id});
+  PlayerBean({@required this.name, this.id});
 
-  factory Player.fromJson(Map<String, dynamic> json) =>
-      Player(
-          name: json["name"],
-          id: json["id"]
-      );
-
-  Map<String, dynamic> toJson() =>
-      {
-        "name": name,
-        "id": id,
-      };
+  factory PlayerBean.fromDb(Player player) {
+    if (player == null) return null;
+    return PlayerBean(name: player.pseudo, id: player.id);
+  }
 
   @override
   String toString() {
