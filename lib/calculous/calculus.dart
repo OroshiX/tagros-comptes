@@ -1,24 +1,26 @@
 import 'package:tagros_comptes/model/camp.dart';
-import 'package:tagros_comptes/model/info_entry.dart';
+import 'package:tagros_comptes/model/info_entry_player.dart';
+import 'package:tagros_comptes/model/player.dart';
 import 'package:tagros_comptes/model/poignee.dart';
 import 'package:tagros_comptes/model/prise.dart';
 
-Map<String, double> calculateGains(InfoEntry infoEntry,
-    List<String> players) {
+Map<String, double> calculateGains(
+    InfoEntryPlayerBean infoEntryPlayer, List<PlayerBean> playersList) {
+  final players = playersList.map((e) => e.name).toList();
   // Assert that players in entry exist in the list of players
-  assert(players.contains(infoEntry.player));
-  if (infoEntry.withPlayers != null) {
-    for (var withPlayer in infoEntry.withPlayers) {
-      assert(players.contains(withPlayer));
+  assert(players.contains(infoEntryPlayer.player.name));
+  if (infoEntryPlayer.withPlayers != null) {
+    for (var withPlayer in infoEntryPlayer.withPlayers) {
+      assert(players.contains(withPlayer.name));
     }
   }
 
   var nbPlayers = players.length;
 
   if (nbPlayers > 5) {
-    assert (infoEntry.withPlayers.length == 2);
+    assert(infoEntryPlayer.withPlayers.length == 2);
   } else if (nbPlayers == 5) {
-    assert (infoEntry.withPlayers.length == 1);
+    assert(infoEntryPlayer.withPlayers.length == 1);
   }
 
   var gros = nbPlayers > 5;
@@ -28,12 +30,12 @@ Map<String, double> calculateGains(InfoEntry infoEntry,
     totalPoints *= 2;
     totalBouts *= 2;
   }
-  var pointsForAttack = infoEntry.pointsForAttack
-      ? infoEntry.points
-      : totalPoints - infoEntry.points;
-  var boutsForAttack = infoEntry.pointsForAttack
-      ? infoEntry.nbBouts
-      : totalBouts - infoEntry.nbBouts;
+  var pointsForAttack = infoEntryPlayer.infoEntry.pointsForAttack
+      ? infoEntryPlayer.infoEntry.points
+      : totalPoints - infoEntryPlayer.infoEntry.points;
+  var boutsForAttack = infoEntryPlayer.infoEntry.pointsForAttack
+      ? infoEntryPlayer.infoEntry.nbBouts
+      : totalBouts - infoEntryPlayer.infoEntry.nbBouts;
   double wonBy;
   if (!gros) {
     switch (boutsForAttack) {
@@ -51,7 +53,7 @@ Map<String, double> calculateGains(InfoEntry infoEntry,
         break;
     }
   } else {
-    switch (infoEntry.nbBouts) {
+    switch (infoEntryPlayer.infoEntry.nbBouts) {
       case 0:
         wonBy = pointsForAttack - 106;
         break;
@@ -79,26 +81,31 @@ Map<String, double> calculateGains(InfoEntry infoEntry,
   bool won = wonBy >= 0;
   // Petit au bout
   int petitPoints = 0;
-  for (var petitAuBout in infoEntry.petitsAuBout) {
-    switch (petitAuBout) {
-      case Camp.ATTACK:
-        petitPoints += won ? 10 : -10;
-        break;
-      case Camp.DEFENSE:
-        petitPoints += won ? -10 : 10;
-        break;
-      case Camp.NONE:
-        break;
+  if (infoEntryPlayer.infoEntry.petitsAuBout != null) {
+    for (var petitAuBout in infoEntryPlayer.infoEntry.petitsAuBout) {
+      switch (petitAuBout) {
+        case Camp.ATTACK:
+          petitPoints += won ? 10 : -10;
+          break;
+        case Camp.DEFENSE:
+          petitPoints += won ? -10 : 10;
+          break;
+        case Camp.NONE:
+          break;
+      }
     }
   }
 
   // Poignee
   var pointsForPoignee = 0;
-  for (var poignee in infoEntry.poignees) {
-    pointsForPoignee += getPoigneePoints(poignee);
+  if (infoEntryPlayer.infoEntry.poignees != null) {
+    for (var poignee in infoEntryPlayer.infoEntry.poignees) {
+      pointsForPoignee += getPoigneePoints(poignee);
+    }
   }
 
-  double mise = (wonBy.abs() + 25 + petitPoints) * getCoeff(infoEntry.prise) +
+  double mise = (wonBy.abs() + 25 + petitPoints) *
+          getCoeff(infoEntryPlayer.infoEntry.prise) +
       pointsForPoignee;
   if (!won) mise = -mise;
 
@@ -109,18 +116,20 @@ Map<String, double> calculateGains(InfoEntry infoEntry,
   }
 
   if (!gros) {
-    if (nbPlayers < 5 || infoEntry.player == infoEntry.withPlayers[0]) {
+    if (nbPlayers < 5 ||
+        infoEntryPlayer.player == infoEntryPlayer.withPlayers[0]) {
       // one player against the others
       for (var player in players) {
-        gains[player] =
-        infoEntry.player == player ? mise * (nbPlayers - 1) : -mise;
+        gains[player] = infoEntryPlayer.player.name == player
+            ? mise * (nbPlayers - 1)
+            : -mise;
       }
     } else {
       // with 5 players, 2 vs 3
       for (var player in players) {
-        if (player == infoEntry.player) {
+        if (player == infoEntryPlayer.player.name) {
           gains[player] = mise * 2;
-        } else if (player == infoEntry.withPlayers[0]) {
+        } else if (player == infoEntryPlayer.withPlayers[0].name) {
           gains[player] = mise;
         } else {
           gains[player] = -mise;
@@ -131,10 +140,10 @@ Map<String, double> calculateGains(InfoEntry infoEntry,
     // TAGROS
     // Common for every tagros
     for (var player in players) {
-      if (player == infoEntry.player) {
+      if (player == infoEntryPlayer.player.name) {
         // taker
         gains[player] = mise * 2;
-      } else if (infoEntry.withPlayers.contains(player)) {
+      } else if (infoEntryPlayer.withPlayers.contains(player)) {
         // Attackers with taker
         gains[player] = mise;
       } else {
@@ -154,11 +163,11 @@ double checkSum(Map<String, double> gains) {
   return sum;
 }
 
-Map<String, double> calculateSum(List<InfoEntry> entries,
-    List<String> players) {
+Map<String, double> calculateSum(
+    List<InfoEntryPlayerBean> entries, List<PlayerBean> players) {
   Map<String, double> sums = {};
   for (var player in players) {
-    sums[player] = 0;
+    sums[player.name] = 0;
   }
 
   for (var entry in entries) {
@@ -170,11 +179,11 @@ Map<String, double> calculateSum(List<InfoEntry> entries,
   return sums;
 }
 
-List<double> transformGainsToList(Map<String, double> gains,
-    List<String> players) {
+List<double> transformGainsToList(
+    Map<String, double> gains, List<PlayerBean> players) {
   var res = List<double>(players.length);
   for (int i = 0; i < players.length; i++) {
-    res[i] = gains[players[i]];
+    res[i] = gains[players[i].name];
   }
 
   return res;
